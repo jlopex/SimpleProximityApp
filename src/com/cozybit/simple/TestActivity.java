@@ -2,18 +2,10 @@ package com.cozybit.simple;
 
 import java.util.ArrayList;
 
-import com.cozybit.proximity.ProximityManager;
-import com.cozybit.proximity.ProximityNetwork;
-import com.cozybit.proximity.mint.IMintChannelListener;
-import com.cozybit.proximity.mint.IMintListener;
-import com.cozybit.proximity.mint.Mint;
-import com.cozybit.proximity.mint.MintChannel;
-
-import android.location.GpsStatus.Listener;
-import android.os.Bundle;
-import android.os.RemoteException;
 import android.app.Activity;
 import android.content.Context;
+import android.os.Bundle;
+import android.os.RemoteException;
 import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
@@ -22,6 +14,15 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
+
+// Proximity imports
+
+import com.cozybit.proximity.ProximityManager;
+import com.cozybit.proximity.ProximityNetwork;
+import com.cozybit.proximity.mint.IMintChannelListener;
+import com.cozybit.proximity.mint.IMintListener;
+import com.cozybit.proximity.mint.Mint;
+import com.cozybit.proximity.mint.MintChannel;
 
 public class TestActivity extends Activity {
 
@@ -106,16 +107,10 @@ public class TestActivity extends Activity {
 		}
 		
 		@Override
-		public void onNetworkLost() {
-			// TODO Auto-generated method stub
-			
-		}
+		public void onNetworkLost() {}
 		
 		@Override
-		public void onError(int reason) {
-			// TODO Auto-generated method stub
-			
-		}
+		public void onError(int reason) {}
 	};
 
 	// UI stuff...
