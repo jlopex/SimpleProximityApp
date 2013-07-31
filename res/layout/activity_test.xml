@@ -10,23 +10,17 @@
          android:layout_width="match_parent"
          android:layout_height="wrap_content" >
 
-     <Button
-         android:id="@+id/button1"
-         android:layout_width="wrap_content"
+     <Spinner
+         android:id="@+id/spinner1"
+         android:layout_width="0dip"
          android:layout_height="wrap_content"
-         android:text="Manager" />
-     
-     <Button
-         android:id="@+id/button2"
-         android:layout_width="wrap_content"
+         android:layout_weight="1" />
+
+     <ToggleButton
+         android:id="@+id/toggleButton1"
+         android:layout_width="105dp"
          android:layout_height="wrap_content"
-         android:text="Network" />
-          
-     <Button
-         android:id="@+id/button3"
-         android:layout_width="wrap_content"
-         android:layout_height="wrap_content"
-         android:text="Mint" />
+         android:text="" />
          
      </LinearLayout>
 

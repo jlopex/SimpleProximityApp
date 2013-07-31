@@ -3,22 +3,35 @@ package com.cozybit.simple;
 import java.util.ArrayList;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.Spinner;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
 // Proximity imports
 
+import com.cozybit.proximity.ProximityAuth;
+import com.cozybit.proximity.ProximityIntent;
+import com.cozybit.proximity.ProximityInterface;
 import com.cozybit.proximity.ProximityManager;
 import com.cozybit.proximity.ProximityNetwork;
+import com.cozybit.proximity.ProximityProfile;
 import com.cozybit.proximity.mint.IMintChannelListener;
 import com.cozybit.proximity.mint.IMintListener;
 import com.cozybit.proximity.mint.Mint;
@@ -26,27 +39,34 @@ import com.cozybit.proximity.mint.MintChannel;
 
 public class TestActivity extends Activity {
 
+	protected static final String TAG = "SimpleApp";
 	// UI stuff
 	private Context mContext;
-	private Button mButton1;
+	private Spinner mSpinner;
+	/*	private Button mButton1;
 	private Button mButton2;
-	private Button mButton3;
+	private Button mButton3;*/
 	private Button mButton4;
+	private ToggleButton mToogleButton;
+
 	private EditText mEditText;
 	private ListView mListView;
 	private ArrayList<String> mList;
 	private ArrayAdapter<String> mListAdapter;
-	
+
 	// Proximity stuff
 	private ProximityManager mManager;
 	private ProximityNetwork mProximityNetwork;
 	private Mint mMint;
 	private MintChannel mMintChannel;
+	private ProximityInterface mInterface = ProximityInterface.UNKNOWN;
+
 	private IMintListener listener = new IMintListener() {
-		
+
 		@Override
 		public void onStarted(String nodeName, int reason) {
 			Toast.makeText(mContext, "Started Mint", Toast.LENGTH_SHORT).show();
+			addToMessageList ("Mint has started");
 			mMintChannel = mMint.joinChannel(mMint.getPublicChannelName(), new IMintChannelListener() {
 
 				@Override
@@ -105,16 +125,39 @@ public class TestActivity extends Activity {
 				}
 			});
 		}
-		
+
 		@Override
 		public void onNetworkLost() {}
-		
+
 		@Override
 		public void onError(int reason) {}
 	};
 
+	private BroadcastReceiver mReceiver = new BroadcastReceiver() {
+
+		@Override
+		public void onReceive(Context context, Intent intent) {
+
+			if (intent.getAction().equals(ProximityIntent.PROXIMITY_NETWORK_CONNECTED)) {
+				Toast.makeText(context, "Got proximity network with Interface " +
+						intent.getStringExtra(ProximityIntent.EXTRA_PROXIMITY_INTERFACE_NAME), Toast.LENGTH_SHORT).show();
+				startMint();
+			} else if (intent.getAction().equals(ProximityIntent.PROXIMITY_MANAGER_BOUND)) {
+				// Manager has connected to service
+				if (mManager != null)
+					getProximityNetwork();
+			} else if (intent.getAction().equals(ProximityIntent.PROXIMITY_MANAGER_UNBOUND)) {
+				// Manager disconnected
+				if (mToogleButton.isChecked())
+					mToogleButton.toggle();
+
+				mManager = null;
+			}
+		}
+	};
+
 	// UI stuff...
-	
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -125,36 +168,78 @@ public class TestActivity extends Activity {
 		mListAdapter = new ArrayAdapter<String>(mContext, android.R.layout.simple_list_item_1, mList);
 		mListView = (ListView) findViewById(R.id.list);
 		mListView.setAdapter(mListAdapter);
+		mListView.setTranscriptMode(ListView.TRANSCRIPT_MODE_ALWAYS_SCROLL);
+		mListView.setStackFromBottom(true);
 
 		mEditText = (EditText) findViewById(R.id.chat_text);
-		mButton1 = (Button) findViewById(R.id.button1);
-		mButton2 = (Button) findViewById(R.id.button2);
-		mButton3 = (Button) findViewById(R.id.button3);
+
+
+		mSpinner = (Spinner) findViewById(R.id.spinner1);
+		// Create an ArrayAdapter using the string array and a default spinner layout
+		ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this,
+				R.array.networks, android.R.layout.simple_spinner_item);
+		// Specify the layout to use when the list of choices appears
+		adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+		// Apply the adapter to the spinner
+		mSpinner.setAdapter(adapter);
+
+		mSpinner.setOnItemSelectedListener(new OnItemSelectedListener() {
+
+			@Override
+			public void onItemSelected(AdapterView<?> parent, View view,
+					int pos, long id) {
+				switch (pos) {
+				case 0:
+					// Infra
+					mInterface = ProximityInterface.INFRASTRUCTURE;
+					break;
+				case 1:
+					// WFD
+					mInterface = ProximityInterface.WIFI_DIRECT;
+					break;
+				case 2:
+					// Mesh
+					mInterface = ProximityInterface.MESH;
+					break;
+				default:
+					break;
+				}
+			}
+
+			@Override
+			public void onNothingSelected(AdapterView<?> parent) {
+				// TODO Auto-generated method stub
+				mInterface = ProximityInterface.UNKNOWN;
+			}
+		});
+
+		mToogleButton = (ToggleButton) findViewById(R.id.toggleButton1);
+		mToogleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+				if (isChecked) {
+					Log.d(TAG, "Enabled");
+					// disable spinner
+					mSpinner.setEnabled(false);
+					getProximityManager();
+
+					// Only if we are already bound
+					if (mManager.isBound())
+						getProximityNetwork();
+
+				} else {
+					Log.d(TAG, "Disabled");
+					if (mProximityNetwork != null)
+						mProximityNetwork.releaseProximityNetwork();
+					// Clear the messages
+					clearMessageList();
+					// enable spinner
+					mSpinner.setEnabled(true);
+
+				}
+			}
+		});
+
 		mButton4 = (Button) findViewById(R.id.button4);
-
-		mButton1.setOnClickListener(new OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				getProximityManager();
-			}
-		});
-
-		mButton2.setOnClickListener(new OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				getProximityNetwork();
-			}
-		});
-
-		mButton3.setOnClickListener(new OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				startMint();
-			}
-		});
 
 		mButton4.setOnClickListener(new OnClickListener() {
 
@@ -163,11 +248,17 @@ public class TestActivity extends Activity {
 				sendMessage();
 			}
 		});
-
 	}
 
 	public void addToMessageList(String text) {
-		mList.add(text);
+		if (mToogleButton.isChecked()) {
+			mList.add(text);
+			mListAdapter.notifyDataSetChanged();
+		}
+	}
+
+	public void clearMessageList() {
+		mList.clear();
 		mListAdapter.notifyDataSetChanged();
 	}
 
@@ -185,15 +276,15 @@ public class TestActivity extends Activity {
 	}
 
 	// Proximity code
-	
+
 	public void sendMessage() {
 		if (mMintChannel != null ) {
 			mMintChannel.sendData(null, "message/mint", createPayload(
-							      mEditText.getText().toString()));
+					mEditText.getText().toString()));
 		}
 		mEditText.getText().clear();
 	}
-	
+
 	protected void startMint() {
 		if (mProximityNetwork != null) {
 			Toast.makeText(mContext, "Starting Mint", Toast.LENGTH_SHORT).show();
@@ -205,7 +296,16 @@ public class TestActivity extends Activity {
 		if (mManager != null) {
 			Toast.makeText(mContext, "Getting ProximityNetwork", Toast.LENGTH_SHORT).show();
 			try {
-				mProximityNetwork = mManager.getProximityNetwork();
+				ProximityAuth auth = ProximityAuth.PLAIN;
+				mProximityNetwork = mManager.getProximityNetwork(
+						mInterface,
+						auth,
+						ProximityProfile.DEFAULT);
+
+				IntentFilter filter = new IntentFilter(ProximityIntent.PROXIMITY_NETWORK_CONNECTED);
+				filter.addAction(ProximityIntent.PROXIMITY_NETWORK_DISCONNECTED);
+				filter.addAction(ProximityIntent.PROXIMITY_NETWORK_FAILED);
+				mProximityNetwork.registerReceiver(mReceiver, filter);
 			} catch (IllegalStateException e) {
 				Toast.makeText(mContext, "Error getting ProximityNetwork", Toast.LENGTH_SHORT).show();
 			} catch (RemoteException e) {
@@ -216,7 +316,16 @@ public class TestActivity extends Activity {
 	}
 
 	protected void getProximityManager() {
-		Toast.makeText(mContext, "Getting ProximityManager", Toast.LENGTH_SHORT).show();
-		mManager = new ProximityManager(mContext);
+		if (mManager == null) {
+			Toast.makeText(mContext, "Getting ProximityManager", Toast.LENGTH_SHORT).show();
+
+			mManager = new ProximityManager(mContext);
+
+			IntentFilter filter = new IntentFilter(ProximityIntent.PROXIMITY_MANAGER_BOUND);
+			filter.addAction(ProximityIntent.PROXIMITY_MANAGER_UNBOUND);
+
+			registerReceiver(mReceiver, filter);
+		} else
+			Toast.makeText(mContext, "reusing ProximityManager", Toast.LENGTH_SHORT).show();
 	}
 }
